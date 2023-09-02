@@ -3,9 +3,14 @@ package service
 import (
 	"awesomeProject/webook/internal/domain"
 	"awesomeProject/webook/internal/repository"
+	"awesomeProject/webook/internal/service/sms/aliyun"
 	"context"
 	"errors"
+	"github.com/aliyun/alibaba-cloud-sdk-go/sdk"
+	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/auth/credentials"
+	"github.com/aliyun/alibaba-cloud-sdk-go/services/dysmsapi"
 	"golang.org/x/crypto/bcrypt"
+	"os"
 )
 
 var ErrUserDuplicateEmail = repository.ErrUserDuplicateEmail
@@ -67,4 +72,26 @@ func (svc *UserService) Profile(ctx context.Context, id int64) (domain.User, err
 		return domain.User{}, err
 	}
 	return u, nil
+}
+
+func (svc *UserService) SendSMS(ctx context.Context) {
+	config := sdk.NewConfig()
+	credential := credentials.NewAccessKeyCredential(os.Getenv("ALIBABA_CLOUD_ACCESS_KEY_ID"), os.Getenv("ALIBABA_CLOUD_ACCESS_KEY_SECRET"))
+	client, err := dysmsapi.NewClientWithOptions("cn-hangzhou", config, credential)
+
+	if err != nil {
+		panic(err)
+	}
+
+	SignName := "阿里云短信测试"
+	TemplateCode := "SMS_154950909"
+	PhoneNumbers := "1******"
+	TemplateParam := "{\"code\":\"34561\"}"
+
+	aliyService := aliyun.NewService(SignName, client)
+	err = aliyService.Send(ctx, TemplateCode, TemplateParam, PhoneNumbers)
+	if err != nil {
+		panic(err)
+	}
+
 }

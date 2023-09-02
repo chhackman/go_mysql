@@ -57,6 +57,7 @@ func (u *UserHandler) RegisterRoutes(server *gin.Engine) {
 	//ug.GET("/profile", u.ProfileJWT)
 	ug.POST("/signup", u.SignUp)
 	ug.POST("/login", u.Login)
+	ug.GET("/sms", u.SendSMS)
 	ug.GET("/logout", u.Logout)
 	//ug.POST("/login", u.LoginJWT)
 	ug.POST("/edit", u.Edit)
@@ -247,6 +248,11 @@ func (u *UserHandler) ProfileJWT(ctx *gin.Context) {
 	println(claims.Uid)
 	ctx.String(http.StatusOK, "你的profile")
 }
+
+func (u *UserHandler) SendSMS(ctx *gin.Context) {
+	u.svc.SendSMS(ctx)
+}
+
 func (u *UserHandler) Profile(ctx *gin.Context) {
 	sess := sessions.Default(ctx)
 	id := sess.Get("userId")
