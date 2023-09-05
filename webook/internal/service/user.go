@@ -10,6 +10,7 @@ import (
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/auth/credentials"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/dysmsapi"
 	"golang.org/x/crypto/bcrypt"
+	"os"
 )
 
 var ErrUserDuplicateEmail = repository.ErrUserDuplicateEmail
@@ -75,8 +76,8 @@ func (svc *UserService) Profile(ctx context.Context, id int64) (domain.User, err
 
 func (svc *UserService) SendSMS(ctx context.Context) {
 	config := sdk.NewConfig()
-	//credential := credentials.NewAccessKeyCredential(os.Getenv("ALIBABA_CLOUD_ACCESS_KEY_ID"), os.Getenv("ALIBABA_CLOUD_ACCESS_KEY_SECRET"))
-	credential := credentials.NewAccessKeyCredential("LTAI5tCwNDBx3jVBxSmYggrn", "MyFSyxr1ioqWzKNP33gFXnpeG5mUaU")
+	credential := credentials.NewAccessKeyCredential(os.Getenv("ALIBABA_CLOUD_ACCESS_KEY_ID"), os.Getenv("ALIBABA_CLOUD_ACCESS_KEY_SECRET"))
+
 	client, err := dysmsapi.NewClientWithOptions("cn-hangzhou", config, credential)
 
 	if err != nil {
