@@ -6,6 +6,7 @@ import (
 	cache2 "awesomeProject/webook/internal/repository/cache"
 	"awesomeProject/webook/internal/repository/dao"
 	"awesomeProject/webook/internal/service"
+	"awesomeProject/webook/internal/service/sms/memory"
 	"awesomeProject/webook/internal/web"
 	"awesomeProject/webook/internal/web/middleware"
 	"github.com/gin-contrib/cors"
@@ -37,7 +38,14 @@ func initUser(db *gorm.DB, redisCmd *redis2.Client) *web.UserHandler {
 	cacheV3 := cache2.NewUserCache(redisCmd)
 	repo := repository.NewUserRepository(ud, cacheV3)
 	svc := service.NewUserService(repo)
-	u := web.NewUserHandler(svc)
+
+	//加内存验证码
+	//codeCache := cache2.NewUserCache()
+	codeCache := cache2.NewCodeCache(redisCmd)
+	codeRepo := repository.NewCodeRepository(codeCache)
+	SmsSvc := memory.NewService()
+	codeSvc := service.NewCodeService(codeRepo, SmsSvc)
+	u := web.NewUserHandler(svc, codeSvc)
 	return u
 }
 func initWebServer() *gin.Engine {
@@ -83,8 +91,11 @@ func initWebServer() *gin.Engine {
 	}
 	server.Use(sessions.Sessions("mysession", store))
 
-	server.Use(middleware.NewLoginMiddlewareBuilder().IgnorePaths("/users/signup").
-		IgnorePaths("/users/login").Build())
+	server.Use(middleware.NewLoginMiddlewareBuilder().
+		IgnorePaths("/users/signup").
+		IgnorePaths("/users/login").
+		IgnorePaths("/users/login_sms/code/send").
+		IgnorePaths("/users/login_sms").Build())
 	//jwt
 	//server.Use(middleware.NewLoginJWTMiddlewareBuilder().IgnorePaths("/users/signup").
 	//	IgnorePaths("/users/login").Build())
