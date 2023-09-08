@@ -1,6 +1,7 @@
 package dao
 
 import (
+	"database/sql"
 	"errors"
 	"github.com/go-sql-driver/mysql"
 	"golang.org/x/net/context"
@@ -11,7 +12,7 @@ import (
 type User struct {
 	Id int64 `gorm:"primaryKey,autoIncrement"`
 	// 全部用户唯一
-	Email    string `gorm:"unique"`
+	Email    sql.NullString `gorm:"unique"`
 	Password string
 
 	// 往这面加
@@ -19,6 +20,7 @@ type User struct {
 	Birthday string
 	Abstract string
 
+	Phone sql.NullString `gorm:"unique"`
 	// 创建时间，毫秒数
 	Ctime int64
 	// 更新时间，毫秒数
@@ -44,6 +46,13 @@ func (dao *UserDAO) FindByEmail(ctx context.Context, email string) (User, error)
 	var u User
 	//var daotest *gorm.DB
 	err := dao.db.WithContext(ctx).Where("email = ?", email).First(&u).Error
+	return u, err
+}
+
+func (dao *UserDAO) FindByPhone(ctx context.Context, Phone string) (User, error) {
+	var u User
+	//var daotest *gorm.DB
+	err := dao.db.WithContext(ctx).Where("Phone = ?", Phone).First(&u).Error
 	return u, err
 }
 

@@ -13,10 +13,10 @@ var (
 //import "github.com/rogpeppe/go-internal/cache"
 
 type CodeRepository struct {
-	cache *cache.CodeCache
+	cache *cache.CodeRedisCache
 }
 
-func NewCodeRepository(c *cache.CodeCache) *CodeRepository {
+func NewCodeRepository(c *cache.CodeRedisCache) *CodeRepository {
 	return &CodeRepository{
 		cache: c,
 	}
@@ -25,5 +25,5 @@ func (repo *CodeRepository) Store(ctx context.Context, biz string, phone string,
 	return repo.cache.Set(ctx, biz, phone, code)
 }
 func (repo *CodeRepository) Verify(ctx context.Context, biz, phone, inputCode string) (bool, error) {
-	return repo.Verify(ctx, biz, phone, inputCode)
+	return repo.cache.Verify(ctx, biz, phone, inputCode)
 }

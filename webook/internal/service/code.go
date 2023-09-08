@@ -8,6 +8,11 @@ import (
 	"math/rand"
 )
 
+var (
+	ErrCodeSendTooMany        = repository.ErrCodeSendTooMany
+	ErrCodeVerifyTooManyTimes = repository.ErrCodeVerifyTooManyTimes
+)
+
 const tpl = "SMS_154950909"
 
 type CodeService struct {
@@ -48,7 +53,7 @@ func (svc *CodeService) generateCode() string {
 
 	//不够6位的，加上前导0
 	//000001
-	return fmt.Sprintf("%6d", num)
+	return fmt.Sprintf("%06d", num)
 }
 
 func (svc *CodeService) Verify(ctx context.Context, biz string, phone string, inputCode string) (bool, error) {

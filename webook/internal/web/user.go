@@ -16,6 +16,11 @@ import (
 	"unicode/utf8"
 )
 
+const biz = "login"
+
+//确保UserHandler实现了handlder接口
+var _ handler = (*UserHandler)(nil)
+
 type UserHandler struct {
 	svc         *service.UserService
 	emailExp    *regexp.Regexp
@@ -55,19 +60,63 @@ func NewUserHandler(svc *service.UserService, codeSvc *service.CodeService) *Use
 
 func (u *UserHandler) RegisterRoutes(server *gin.Engine) {
 	ug := server.Group("/users")
-	ug.GET("/profile", u.Profile)
-	//ug.GET("/profile", u.ProfileJWT)
+	//ug.GET("/profile", u.Profile)
+	ug.GET("/profile", u.ProfileJWT)
 	ug.POST("/signup", u.SignUp)
-	ug.POST("/login", u.Login)
-	ug.GET("/sms", u.SendSMS)
+	//ug.POST("/login", u.Login)
+	//ug.GET("/sms", u.SendSMS)
 	ug.GET("/logout", u.Logout)
-	//ug.POST("/login", u.LoginJWT)
+	ug.POST("/login", u.LoginJWT)
 	ug.POST("/edit", u.Edit)
 
 	ug.POST("/login_sms/code/send", u.SendLoginSMSCode)
 	ug.POST("/login_sms", u.LoginSMS)
 }
 func (u *UserHandler) LoginSMS(ctx *gin.Context) {
+	type Req struct {
+		Phone string `json:"phone"`
+		Code  string `json:"code"`
+	}
+	var req Req
+	if err := ctx.Bind(&req); err != nil {
+		return
+	}
+	//这面加校验，手机号之类的
+	ok, err := u.codesvc.Verify(ctx, biz, req.Phone, req.Code)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
+		return
+	}
+	if !ok {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 4,
+			Msg:  "验证码有误",
+		})
+		return
+	}
+
+	user, err := u.svc.FindOrCreate(ctx, req.Phone)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
+		return
+	}
+	if err = u.setJWTToken(ctx, user.Id); err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
+		return
+	}
+	ctx.JSON(http.StatusOK, Result{
+		Code: 5,
+		Msg:  "验证码校验通过",
+	})
 
 }
 
@@ -80,18 +129,27 @@ func (u *UserHandler) SendLoginSMSCode(ctx *gin.Context) {
 		return
 	}
 
-	const biz = "login"
 	err := u.codesvc.Send(ctx, biz, req.Phone)
-	if err != nil {
+	switch err {
+	case nil:
+		ctx.JSON(http.StatusOK, Result{
+			Msg: "发送成功",
+		})
+		return
+	case service.ErrCodeSendTooMany:
+		ctx.JSON(http.StatusOK, Result{
+			Msg: "发送太频繁请稍后再试",
+		})
+		return
+	default:
 		ctx.JSON(http.StatusOK, Result{
 			Code: 5,
 			Msg:  "系统错误",
 		})
 		return
+
 	}
-	ctx.JSON(http.StatusOK, Result{
-		Msg: "发送成功",
-	})
+
 }
 
 func (u *UserHandler) SignUp(ctx *gin.Context) {
@@ -220,27 +278,35 @@ func (u *UserHandler) LoginJWT(ctx *gin.Context) {
 	//sess.Save()
 	//ctx.String(http.StatusOK, "登录成功")
 
+	if err := u.setJWTToken(ctx, user.Id); err != nil {
+		ctx.String(http.StatusOK, "系统错误")
+		return
+	}
+	//fmt.Printf(user)
+	ctx.String(http.StatusOK, "登录成功")
+	//println(user)
+	//fmt.Printf(user)
+	return
+}
+
+func (u *UserHandler) setJWTToken(ctx *gin.Context, uid int64) error {
 	//这里使用jwt设置登录态
 	cliams := UserCliams{
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute)),
 		},
-		Uid:       user.Id,
+		Uid:       uid,
 		UserAgent: ctx.Request.UserAgent(),
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS512, cliams)
 	tokenStr, err := token.SignedString([]byte("95osj3fUD7fo0mlYdDbncXz4VD2igvf0"))
 	if err != nil {
-		ctx.String(http.StatusInternalServerError, "系统错误")
-		return
+		return err
 	}
 	ctx.Header("x-jwt-token", tokenStr)
-	//fmt.Printf(user)
-	ctx.String(http.StatusOK, "登录成功")
-	//println(user)
-	//fmt.Printf(user)
-	return
+	return nil
+
 }
 
 // CustomValidator 是自定义的验证器结构
@@ -334,8 +400,8 @@ func (u *UserHandler) Profile(ctx *gin.Context) {
 		Nickname: user.Nickname,
 		Birthday: user.Birthday,
 		Abstract: user.Abstract,
-		Ctime:    user.Ctime,
-		Utime:    user.Utime,
+		Ctime:    user.Ctime.Format("2006-01-02 15:04:05"),
+		Utime:    user.Utime.Format("2006-01-02 15:04:05"),
 	}
 	ctx.JSON(http.StatusOK, userReq)
 
