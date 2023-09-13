@@ -15,13 +15,22 @@ var (
 
 const tpl = "SMS_154950909"
 
-type CodeService struct {
-	repo   *repository.CodeRepository
+type CodeService interface {
+	Send(ctx context.Context,
+		////biz区别业务场景
+		biz string,
+		//这个码谁来管,谁来生成
+		phone string) error
+	Verify(ctx context.Context, biz string, phone string, inputCode string) (bool, error)
+}
+
+type codeService struct {
+	repo   repository.CodeRepository
 	smsSvc sms.Service
 }
 
-func NewCodeService(repo *repository.CodeRepository, smSvc sms.Service) *CodeService {
-	return &CodeService{
+func NewCodeService(repo repository.CodeRepository, smSvc sms.Service) CodeService {
+	return &codeService{
 		repo:   repo,
 		smsSvc: smSvc,
 	}
@@ -29,7 +38,7 @@ func NewCodeService(repo *repository.CodeRepository, smSvc sms.Service) *CodeSer
 
 //发送验证码
 //biz区别业务场景
-func (svc *CodeService) Send(ctx context.Context,
+func (svc *codeService) Send(ctx context.Context,
 	////biz区别业务场景
 	biz string,
 	//这个码谁来管,谁来生成
@@ -47,7 +56,7 @@ func (svc *CodeService) Send(ctx context.Context,
 	return err
 
 }
-func (svc *CodeService) generateCode() string {
+func (svc *codeService) generateCode() string {
 	//六位数,num在0,99999之间，包含0和999999
 	num := rand.Intn(1000000)
 
@@ -56,6 +65,6 @@ func (svc *CodeService) generateCode() string {
 	return fmt.Sprintf("%06d", num)
 }
 
-func (svc *CodeService) Verify(ctx context.Context, biz string, phone string, inputCode string) (bool, error) {
+func (svc *codeService) Verify(ctx context.Context, biz string, phone string, inputCode string) (bool, error) {
 	return svc.repo.Verify(ctx, biz, phone, inputCode)
 }

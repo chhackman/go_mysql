@@ -7,25 +7,35 @@ import (
 	"context"
 	"errors"
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk"
+	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/auth/credentials"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/dysmsapi"
 	"golang.org/x/crypto/bcrypt"
+	"os"
 )
 
 var ErrUserDuplicateEmail = repository.ErrUserDuplicateEmail
 var ErrInvalidUserOrPassword = errors.New("账号/邮箱或密码不对")
 var ErrInvalidUserNotFund = errors.New("不存在该用户")
 
-type UserService struct {
-	repo *repository.UserRepository
+type UserService interface {
+	Login(ctx context.Context, email, password string) (domain.User, error)
+	SignUp(ctx context.Context, u domain.User) error
+	FindOrCreate(ctx context.Context, phone string) (domain.User, error)
+	Profile(ctx context.Context, id int64) (domain.User, error)
+	SendSMS(ctx context.Context)
+	EditUserProfile(ctx context.Context, id int64, u domain.User) error
+}
+type userService struct {
+	repo repository.UserRepository
 }
 
-func NewUserService(repo *repository.UserRepository) *UserService {
-	return &UserService{
+func NewUserService(repo repository.UserRepository) UserService {
+	return &userService{
 		repo: repo,
 	}
 }
 
-func (svc *UserService) Login(ctx context.Context, email, password string) (domain.User, error) {
+func (svc *userService) Login(ctx context.Context, email, password string) (domain.User, error) {
 	//先找用户
 	u, err := svc.repo.FindByEmail(ctx, email)
 	if err == repository.ErrUserNotFound {
@@ -42,7 +52,7 @@ func (svc *UserService) Login(ctx context.Context, email, password string) (doma
 	return u, nil
 }
 
-func (svc *UserService) SignUp(ctx context.Context, u domain.User) error {
+func (svc *userService) SignUp(ctx context.Context, u domain.User) error {
 	//你要考虑加密放在哪些的问题
 	hash, err := bcrypt.GenerateFromPassword([]byte(u.Password), bcrypt.DefaultCost)
 	if err != nil {
@@ -56,11 +66,11 @@ func (svc *UserService) SignUp(ctx context.Context, u domain.User) error {
 	//return svc.repo.Create(ctx, u)
 }
 
-func (svg *UserService) EditUserProfile(ctx context.Context, id int64, u domain.User) error {
+func (svg *userService) EditUserProfile(ctx context.Context, id int64, u domain.User) error {
 	return svg.repo.Edit(ctx, id, u)
 }
 
-func (svc *UserService) Profile(ctx context.Context, id int64) (domain.User, error) {
+func (svc *userService) Profile(ctx context.Context, id int64) (domain.User, error) {
 
 	u, err := svc.repo.FindById(ctx, id)
 	if err == repository.ErrUserNotFound {
@@ -72,9 +82,9 @@ func (svc *UserService) Profile(ctx context.Context, id int64) (domain.User, err
 	return u, nil
 }
 
-func (svc *UserService) SendSMS(ctx context.Context) {
+func (svc *userService) SendSMS(ctx context.Context) {
 	config := sdk.NewConfig()
-	//credential := credentials.NewAccessKeyCredential(os.Getenv("ALIBABA_CLOUD_ACCESS_KEY_ID"), os.Getenv("ALIBABA_CLOUD_ACCESS_KEY_SECRET"))
+	credential := credentials.NewAccessKeyCredential(os.Getenv("ALIBABA_CLOUD_ACCESS_KEY_ID"), os.Getenv("ALIBABA_CLOUD_ACCESS_KEY_SECRET"))
 	client, err := dysmsapi.NewClientWithOptions("cn-hangzhou", config, credential)
 
 	if err != nil {
@@ -94,7 +104,7 @@ func (svc *UserService) SendSMS(ctx context.Context) {
 
 }
 
-func (svc *UserService) FindOrCreate(ctx context.Context, phone string) (domain.User, error) {
+func (svc *userService) FindOrCreate(ctx context.Context, phone string) (domain.User, error) {
 	//svc.repo.FindByPhone(ctx, phone)
 	u, err := svc.repo.FindByPhone(ctx, phone)
 	if err != repository.ErrUserNotFound {
